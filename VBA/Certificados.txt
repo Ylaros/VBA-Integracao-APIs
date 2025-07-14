@@ -1,0 +1,175 @@
+aAttribute VB_Name = "Módulo2"
+Sub Certificados()
+    Dim Http As Object
+    Dim url As String
+    Dim response As String
+    Dim json As Object
+    Dim i As Integer
+    Dim page As Integer
+    Dim totalPages As Integer
+    Dim certificado As Object
+    Dim ws As Worksheet
+    Dim sheet As Worksheet
+    
+    ' Deletar todas as planilhas, exceto "Planilha1"
+    On Error Resume Next ' Para evitar erro caso não exista a "Planilha1"
+    For Each sheet In ThisWorkbook.Sheets
+        If sheet.Name <> "Planilha1" Then
+            sheet.Delete
+        End If
+    Next sheet
+    On Error GoTo 0 ' Desliga o tratamento de erro
+    
+    ' Criar a planilha "Certificados" se não existir
+    On Error Resume Next
+    Set ws = Sheets("Certificados")
+    On Error GoTo 0
+    
+    If ws Is Nothing Then
+        Set ws = Sheets.Add
+        ws.Name = "Certificados"
+    Else
+        ws.Cells.Clear ' Limpar dados existentes
+    End If
+    
+    ' Adicionar cabeçalho
+    ws.Cells(1, 1).Value = "Id"
+    ws.Cells(1, 2).Value = "Nome"
+    ws.Cells(1, 3).Value = "CnpjCpf"
+    ws.Cells(1, 4).Value = "UfCertificado"
+    ws.Cells(1, 5).Value = "DataExpira"
+    ws.Cells(1, 6).Value = "ConsultaNoturna"
+    ws.Cells(1, 7).Value = "Ativo"
+    ws.Cells(1, 8).Value = "Deletado"
+    
+    ' Defina o número da página inicial
+    page = 1
+    totalPages = 1 ' Inicialmente definimos como 1 página, vai ser ajustado pela API, caso necessário
+    
+    ' Crie o objeto XMLHttpRequest
+    Set Http = CreateObject("MSXML2.XMLHTTP")
+    
+    ' Loop para obter todos os certificados, considerando a paginação
+    Do While page <= totalPages
+        ' Atualize a URL com o número da página
+        url = "https://api.sieg.com/api/Certificado/ListarCertificados?active=true&api_key=INSERTYOURAPIKEY" & page
+        
+        ' Envie a requisição GET
+        Http.Open "GET", url, False
+        Http.send
+        
+        ' Verifique se a resposta foi bem-sucedida
+        If Http.Status = 200 Then
+            response = Http.ResponseText
+            
+            ' Parse do JSON retornado
+            Set json = JsonConverter.ParseJson(response)
+            
+            ' Exiba a resposta JSON para analisar a estrutura
+            Debug.Print response
+            
+            ' Iterar sobre os objetos na lista JSON (array)
+            i = 2 ' Começa na linha 2 para evitar sobrescrever o cabeçalho
+            For Each certificado In json
+                ' Preencha os dados na planilha
+                ws.Cells(i, 1).Value = certificado("Id")
+                ws.Cells(i, 2).Value = certificado("Nome")
+                ws.Cells(i, 3).Value = certificado("CnpjCpf")
+                ws.Cells(i, 4).Value = certificado("UfCertificado")
+                ws.Cells(i, 5).Value = certificado("DataExpira")
+                ws.Cells(i, 6).Value = certificado("ConsultaNoturna")
+                ws.Cells(i, 7).Value = certificado("Ativo")
+                ws.Cells(i, 8).Value = certificado("Deletado")
+                i = i + 1
+            Next certificado
+            
+            ' Se houver um campo indicando o número total de páginas, atualize
+'            If Not json("totalPages") Is Nothing Then
+'                totalPages = json("totalPages")
+'            End If
+        Else
+            MsgBox "Erro na requisição: " & Http.Status & " - " & Http.statusText
+            Exit Sub
+        End If
+        
+        ' Incrementar a página para a próxima requisição
+        page = page + 1
+    Loop
+    
+    GetCertificadosInativos
+    
+End Sub
+
+Private Sub GetCertificadosInativos()
+    Dim Http As Object
+    Dim url As String
+    Dim response As String
+    Dim json As Object
+    Dim i As Integer
+    Dim page As Integer
+    Dim totalPages As Integer
+    Dim certificado As Object
+    Dim ws As Worksheet
+    Dim lastRow As Long
+    
+    ' Referencia a planilha "Certificados"
+    Set ws = Sheets("Certificados")
+    
+    ' Defina o número da página inicial
+    page = 1
+    totalPages = 1 ' Inicialmente definimos como 1 página, vai ser ajustado pela API, caso necessário
+    
+    ' Crie o objeto XMLHttpRequest
+    Set Http = CreateObject("MSXML2.XMLHTTP")
+    
+    ' Loop para obter todos os certificados inativos, considerando a paginação
+    Do While page <= totalPages
+        ' Atualize a URL com o número da página
+        url = "https://api.sieg.com/api/Certificado/ListarCertificados?active=false&api_key=E0As%2bvZRFhlTsPIcjcpAWA%3d%3d&page=" & page
+        
+        ' Envie a requisição GET
+        Http.Open "GET", url, False
+        Http.send
+        
+        ' Verifique se a resposta foi bem-sucedida
+        If Http.Status = 200 Then
+            response = Http.ResponseText
+            
+            ' Parse do JSON retornado
+            Set json = JsonConverter.ParseJson(response)
+            
+            ' Exiba a resposta JSON para analisar a estrutura
+            Debug.Print response
+            
+            ' Encontrar a última linha com dados para continuar preenchendo
+            lastRow = ws.Cells(ws.Rows.Count, 1).End(xlUp).Row + 1
+            
+            ' Iterar sobre os objetos na lista JSON (array)
+            For Each certificado In json
+                ' Preencher os dados abaixo dos certificados ativos
+                ws.Cells(lastRow, 1).Value = certificado("Id")
+                ws.Cells(lastRow, 2).Value = certificado("Nome")
+                ws.Cells(lastRow, 3).Value = certificado("CnpjCpf")
+                ws.Cells(lastRow, 4).Value = certificado("UfCertificado")
+                ws.Cells(lastRow, 5).Value = certificado("DataExpira")
+                ws.Cells(lastRow, 6).Value = certificado("ConsultaNoturna")
+                ws.Cells(lastRow, 7).Value = certificado("Ativo")
+                ws.Cells(lastRow, 8).Value = certificado("Deletado")
+                lastRow = lastRow + 1
+            Next certificado
+            
+            ' Se houver um campo indicando o número total de páginas, atualize
+'            If Not json("totalPages") Is Nothing Then
+'                totalPages = json("totalPages")
+'            End If
+        Else
+            MsgBox "Erro na requisição: " & Http.Status & " - " & Http.statusText
+            Exit Sub
+        End If
+        
+        ' Incrementar a página para a próxima requisição
+        page = page + 1
+    Loop
+End Sub
+
+
